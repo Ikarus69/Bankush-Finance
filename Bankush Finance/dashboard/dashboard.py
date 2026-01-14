@@ -21,6 +21,9 @@ class Dashboard:
         if "debt_inputs" not in st.session_state:
             st.session_state.debt_inputs = [{"name": "", "amount": 0}]
 
+        if "form_submitted" not in st.session_state:
+            st.session_state.form_submitted = False
+
         # --- Lottie animation ---
         lottie_ani = self.load_lottie_url(
             "https://assets2.lottiefiles.com/packages/lf20_touohxv0.json"
@@ -66,52 +69,43 @@ class Dashboard:
         option = st.session_state.selected_dashboard
 
         # =========================
-        # ADD BORROWER FORM (MULTI-DEBT)
+        # ADD BORROWER FORM
         # =========================
-        st.subheader("Add New Borrower")
+        if not st.session_state.form_submitted:
+            st.subheader("Add New Borrower")
 
-        income = st.number_input("Monthly Income ($)", 0, 50000, 1000)
+            name = st.text_input("Borrower Name", "")
+            income = st.number_input("Monthly Income (PHP)", 0, 500000, 1000)
 
-        st.markdown("### Existing Debts")
+            st.markdown("### Existing Debts")
+            total_debt = 0
+            for i, debt in enumerate(st.session_state.debt_inputs):
+                col1, col2 = st.columns(2)
+                debt["name"] = col1.text_input(
+                    f"Debt Name #{i+1}", debt["name"], key=f"debt_name_{i}"
+                )
+                debt["amount"] = col2.number_input(
+                    "Amount (PHP)", 0, 1000000, debt["amount"], key=f"debt_amount_{i}"
+                )
+                total_debt += debt["amount"]
 
-        total_debt = 0
-        for i, debt in enumerate(st.session_state.debt_inputs):
-            col1, col2 = st.columns(2)
+            st.markdown(f"**Total Existing Debt:** `PHP {total_debt:,}`")
 
-            debt["name"] = col1.text_input(
-                f"Debt Name #{i+1}",
-                debt["name"],
-                key=f"debt_name_{i}"
-            )
+            col_add, col_submit = st.columns(2)
+            if col_add.button("➕ Add Another Debt"):
+                st.session_state.debt_inputs.append({"name": "", "amount": 0})
+                st.rerun()
 
-            debt["amount"] = col2.number_input(
-                "Amount ($)",
-                0,
-                100000,
-                debt["amount"],
-                key=f"debt_amount_{i}"
-            )
-
-            total_debt += debt["amount"]
-
-        st.markdown(f"**Total Existing Debt:** `${total_debt:,}`")
-
-        col_add, col_submit = st.columns(2)
-
-        if col_add.button("➕ Add Another Debt"):
-            st.session_state.debt_inputs.append({"name": "", "amount": 0})
-            st.rerun()
-
-        payment = st.slider("Payment History (%)", 0, 100, 100)
-
-        if col_submit.button("Add Borrower"):
-            client_id = len(st.session_state.clients) + 1
-
-            client = Client(client_id, income, total_debt, payment)
-            st.session_state.clients.append(client.to_dict())
-
-            st.session_state.debt_inputs = [{"name": "", "amount": 0}]
-            st.success("Borrower added successfully!")
+            if col_submit.button("Add Borrower"):
+                if not name.strip():
+                    st.warning("Please enter borrower name")
+                else:
+                    client_id = len(st.session_state.clients) + 1
+                    client = Client(client_id, income, total_debt, name=name)
+                    st.session_state.clients.append(client.to_dict())
+                    st.session_state.debt_inputs = [{"name": "", "amount": 0}]
+                    st.session_state.form_submitted = True
+                    st.success("Borrower added successfully!")
 
         if not st.session_state.clients:
             st.info("Add borrowers to begin evaluation.")
@@ -126,13 +120,13 @@ class Dashboard:
         if option == "Borrower Financial Overview":
             col1, col2, col3, col4 = st.columns(4)
 
-            col1.metric("Monthly Income", f"${borrower['Income ($)']:,}")
-            col2.metric("Existing Debt", f"${borrower['Debts ($)']:,}")
-            col3.metric(
+            col1.metric("Borrower Name", borrower["Name"])
+            col2.metric("Monthly Income", f"PHP {borrower['Income (PHP)']:,}")
+            col3.metric("Existing Debt", f"PHP {borrower['Debts (PHP)']:,}")
+            col4.metric(
                 "Debt-to-Income Ratio",
-                f"{borrower['Debts ($)'] / max(borrower['Income ($)'], 1):.2f}"
+                f"{borrower['Debts (PHP)'] / max(borrower['Income (PHP)'], 1):.2f}"
             )
-            col4.metric("Loan Requested", "$10,000")
 
         # =========================
         # 2️⃣ LOAN REPAYMENT LIKELIHOOD
@@ -143,7 +137,6 @@ class Dashboard:
                 else "Moderate" if borrower["Risk Level"] == "Medium"
                 else "Low"
             )
-
             st.progress(min(borrower["Score"] / 3, 1.0))
             st.markdown(f"**Likelihood to Repay:** `{likelihood}`")
 
@@ -152,28 +145,23 @@ class Dashboard:
         # =========================
         elif option == "Key Decision Factors":
             st.markdown(f"""
-            - **Income Stability:** {"Strong" if borrower['Income ($)'] > 2000 else "Weak"}
-            - **Credit History:** {"Good" if borrower['Payment %'] >= 80 else "Fair"}
-            - **Debt-to-Income Ratio:** {"Healthy" if borrower['Debts ($)']/max(borrower['Income ($)'],1) < 0.4 else "Risky"}
-            - **Payment Behavior:** {"Consistent" if borrower['Payment %'] >= 75 else "Inconsistent"}
+            - **Income Stability:** {"Strong" if borrower['Income (PHP)'] > 2000 else "Weak"}
+            - **Debt-to-Income Ratio:** {"Healthy" if borrower['Debts (PHP)']/max(borrower['Income (PHP)'],1) < 0.4 else "Risky"}
             """)
 
         # =========================
         # 4️⃣ ELIGIBILITY & RECOMMENDATIONS
         # =========================
         elif option == "Eligibility & Recommendations":
-            if borrower["Eligibility"] == "Approved":
+            if borrower["Eligibility"] == "Eligible":
                 st.success("Eligible for loan approval")
             else:
                 st.warning("Conditionally eligible or declined")
 
             st.markdown("### Recommendations")
-
-            if borrower["Debts ($)"] > borrower["Income ($)"] * 0.4:
+            if borrower["Debts (PHP)"] > borrower["Income (PHP)"] * 0.4:
                 st.write("- Reduce outstanding debt")
-            if borrower["Payment %"] < 75:
-                st.write("- Improve payment consistency")
-            if borrower["Income ($)"] < 2000:
+            if borrower["Income (PHP)"] < 2000:
                 st.write("- Provide additional income documentation")
 
         # =========================
@@ -182,7 +170,7 @@ class Dashboard:
         elif option == "Loan Decision Summary":
             st.markdown(f"""
             **Decision:** `{borrower['Eligibility']}`  
-            **Approved Amount:** `$8,000`  
+            **Approved Amount:** `PHP 8,000`  
             **Suggested Term:** `12 months`  
             **Borrowing Risk Score:** `{borrower['Score']}`  
             """)
