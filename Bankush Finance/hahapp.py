@@ -80,7 +80,7 @@ if st.session_state.get("page", "home") == "home":
 }
 
     div.stButton > button[key="get_started"] {
-        background-color: #00ff7f !important;
+        background-color: #00ff00 !important;
         color: white;
         font-size: 16px;
         padding: 16px 28px;

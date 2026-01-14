@@ -1,10 +1,11 @@
 class Client:
-    def __init__(self, client_id, income, debts, loan_amount=10000, name=""):
+    def __init__(self, client_id, income, debts, loan_amount=10000, name="", debt_details=None):
         self.client_id = client_id
         self.income = income
         self.debts = debts
-        self.loan_amount = loan_amount
+        self.loan_amount = loan_amount  # Requested loan
         self.name = name
+        self.debt_details = debt_details if debt_details else []
 
         self.dti = self.calculate_dti()
         self.score = self.calculate_score()
@@ -16,7 +17,6 @@ class Client:
         return round(self.debts / max(self.income, 1), 2)
 
     def calculate_score(self):
-        # simplified score without payment_percent
         income_factor = min(self.income / 4000, 1)
         debt_factor = 1 - min(self.dti, 1)
         return round((income_factor * 0.6) + (debt_factor * 0.4), 2)
@@ -41,6 +41,8 @@ class Client:
             "Name": self.name,
             "Income (PHP)": self.income,
             "Debts (PHP)": self.debts,
+            "Loan Amount": self.loan_amount,  # <-- include only once
+            "Debt Details": self.debt_details,
             "DTI": self.dti,
             "Score": self.score,
             "Eligibility": self.eligibility,
